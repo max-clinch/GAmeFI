@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+// contract address = 0x1fFac3b1a9F2186E7E6f3370d827B2b35A17B31b
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./MiliToken.sol";
+import "./millionToken.sol";
 
-//import "./interface.sol";
+
 contract MillionaireGame is Ownable(msg.sender) {
     using Math for uint256;
 
