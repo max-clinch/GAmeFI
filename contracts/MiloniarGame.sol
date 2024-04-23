@@ -4,14 +4,23 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./MiliToken.sol";
+import "millionToken.sol";
+
 //import "./interface.sol";
 contract MillionaireGame is Ownable(msg.sender) {
     using Math for uint256;
 
+    // Enumeration representing different protocols/topics
+    enum Protocol {
+        zkSync,
+        Polygon,
+        Hyperlane,
+        Hyperledger
+    }
+
     uint256 public currentQuestionIndex;
     uint256 public totalPrizePool;
-    uint256 public constant MAX_QUESTIONS = 100; // Changed to accommodate more questions
+    uint256 public constant MAX_QUESTIONS = 1000; // Changed to accommodate more questions
     uint256 public constant TIME_LIMIT = 600; // Time limit for answering each question (in seconds)
     uint256 public constant COOLDOWN_PERIOD = 4 days; // Cooldown period for playing again
     uint256 public constant LIFELINE_FEE = 1; // Fee for using lifeline in token units
@@ -23,14 +32,21 @@ contract MillionaireGame is Ownable(msg.sender) {
         uint256 difficultyLevel;
     }
 
+    ERC20 public token; // ERC20 token used in the contract
+
+    // Mapping of protocols to arrays of questions
+    mapping(Protocol => Question[]) public questionsByProtocol;
+
+    // Mapping of user addresses to their selected protocol
+    mapping(address => Protocol) public userProtocolChoice;
+
     Question[MAX_QUESTIONS] public questions;
 
     mapping(address => uint256) public participantBalances;
     mapping(address => bool) public isParticipant;
     mapping(address => uint256) public lastPlayedTimestamp;
     address[] public leaderboard;
-
-    ERC20 public token;
+    
 
     event QuestionAsked(string question, string[4] choices);
     event PrizeWon(address winner, uint256 amount);
@@ -43,472 +59,1015 @@ contract MillionaireGame is Ownable(msg.sender) {
         currentQuestionIndex = 0;
         totalPrizePool = 0;
 
-         // Initialize questions (simplified for example)
+        // Initialize questions (simplified for example)
+        // Add 20 new zkSync questions here
         questions[0] = Question(
-            "What is the capital of France?",
-            ["Paris", "London", "Berlin", "Madrid"],
-            "Paris",
+            "What is zkSync?",
+            [
+                "A layer 2 scaling solution for Ethereum",
+                "A new consensus algorithm",
+                "A blockchain-based social network",
+                "A cryptocurrency trading platform"
+            ],
+            "A layer 2 scaling solution for Ethereum",
             1
         );
         questions[1] = Question(
-            "Which planet is known as the Red Planet?",
-            ["Mars", "Venus", "Jupiter", "Saturn"],
-            "Mars",
+            "Which company developed zkSync?",
+            ["ConsenSys", "Matter Labs", "Chainlink", "Binance"],
+            "Matter Labs",
             1
         );
         questions[2] = Question(
-            "Who wrote 'To Kill a Mockingbird'?",
-            ["Harper Lee", "Stephen King", "J.K. Rowling", "Charles Dickens"],
-            "Harper Lee",
+            "What does zk in zkSync stand for?",
+            ["Zero latency", "Zero complexity", "Zero fees", "Zero-knowledge"],
+            "Zero-knowledge",
             1
         );
         questions[3] = Question(
-            "What is the largest mammal in the world?",
-            ["Elephant", "Blue Whale", "Giraffe", "Hippopotamus"],
-            "Blue Whale",
+            "What technology does zkSync use to achieve scalability?",
+            ["Sidechains", "Plasma", "Rollups", "Sharding"],
+            "Rollups",
             1
         );
         questions[4] = Question(
-            "Which country is home to the kangaroo?",
-            ["Australia", "Brazil", "Canada", "India"],
-            "Australia",
+            "What is the native token of zkSync called?",
+            [
+                "zkCoin",
+                "SyncToken",
+                "zkToken",
+                "zkSync does not have a native token"
+            ],
+            "zkSync does not have a native token",
             1
         );
         questions[5] = Question(
-            "Who is the CEO of Tesla Inc.?",
-            ["Elon Musk", "Jeff Bezos", "Bill Gates", "Mark Zuckerberg"],
-            "Elon Musk",
+            "How does zkSync achieve lower gas fees compared to Ethereum L1?",
+            [
+                "By increasing the block size",
+                "By batching transactions off-chain",
+                "By introducing a new consensus mechanism",
+                "By implementing a new gas token"
+            ],
+            "By batching transactions off-chain",
             1
         );
         questions[6] = Question(
-            "Which element has the chemical symbol 'Fe'?",
-            ["Iron", "Gold", "Silver", "Copper"],
-            "Iron",
+            "Which of the following is a feature of zkSync?",
+            [
+                "Instant withdrawals",
+                "Proof of Authority",
+                "Automated liquidity provision",
+                "Decentralized oracles"
+            ],
+            "Instant withdrawals",
             1
         );
         questions[7] = Question(
-            "What is the capital of Japan?",
-            ["Tokyo", "Seoul", "Beijing", "Bangkok"],
-            "Tokyo",
+            "Which programming language is used to write smart contracts for zkSync?",
+            ["Rust", "Python", "Solidity", "Java"],
+            "Solidity",
             1
         );
         questions[8] = Question(
-            "Who painted the Mona Lisa?",
+            "Is zkSync compatible with existing Ethereum smart contracts?",
             [
-                "Leonardo da Vinci",
-                "Vincent van Gogh",
-                "Pablo Picasso",
-                "Michelangelo"
+                "Yes, it is fully compatible",
+                "No, it requires new contracts to be written",
+                "Partially, only certain functions are compatible",
+                "zkSync does not support smart contracts"
             ],
-            "Leonardo da Vinci",
+            "Yes, it is fully compatible",
             1
         );
         questions[9] = Question(
-            "What is the boiling point of water in Celsius?",
-            ["100\u00B0C", "0\u00B0C", "50\u00B0C", "200\u00B0C"],
-            "100\u00B0C",
+            "What is zkSync's approach to privacy in transactions?",
+            [
+                "Full transaction visibility",
+                "Selective privacy options",
+                "Complete transaction anonymity",
+                "zkSync does not focus on privacy"
+            ],
+            "Selective privacy options",
             1
         );
         questions[10] = Question(
-            "What is the chemical symbol for gold?",
-            ["Au", "Ag", "Hg", "Pt"],
-            "Au",
+            "What consensus mechanism does zkSync use?",
+            [
+                "Proof of Work",
+                "Delegated Proof of Stake",
+                "Proof of Stake",
+                "zkSync does not use a consensus mechanism, it uses rollups"
+            ],
+            "zkSync does not use a consensus mechanism, it uses rollups",
             1
         );
         questions[11] = Question(
-            "Which continent is the largest by land area?",
-            ["Asia", "Africa", "North America", "South America"],
-            "Asia",
+            "How can developers deploy smart contracts on zkSync?",
+            [
+                "By using a custom SDK provided by Matter Labs",
+                "By writing contracts in a specific language called zkSol",
+                "By deploying existing Ethereum smart contracts directly",
+                "By using the zkSync mobile app"
+            ],
+            "By deploying existing Ethereum smart contracts directly",
             1
         );
         questions[12] = Question(
-            "Who discovered penicillin?",
+            "How does zkSync validate transactions?",
             [
-                "Alexander Fleming",
-                "Marie Curie",
-                "Louis Pasteur",
-                "Albert Einstein"
+                "Through a network of validators",
+                "By requiring user authentication",
+                "Using zero-knowledge proofs",
+                "By staking tokens"
             ],
-            "Alexander Fleming",
+            "Using zero-knowledge proofs",
             1
         );
         questions[13] = Question(
-            "What is the main ingredient in guacamole?",
-            ["Avocado", "Tomato", "Onion", "Lemon"],
-            "Avocado",
+            "What is the main benefit of using zkSync for developers?",
+            [
+                "Improved user interface",
+                "Lower fees and higher transaction speeds",
+                "Enhanced security for smart contracts",
+                "Access to a private blockchain"
+            ],
+            "Lower fees and higher transaction speeds",
             1
         );
         questions[14] = Question(
-            "Which planet is closest to the sun?",
-            ["Mercury", "Venus", "Earth", "Mars"],
-            "Mercury",
+            "Does zkSync support NFT transactions?",
+            ["Yes", "No", "", ""],
+            "Yes",
             1
         );
         questions[15] = Question(
-            "What is the currency of Japan?",
-            ["Yen", "Won", "Dollar", "Euro"],
-            "Yen",
+            "What security measure does zkSync use?",
+            [
+                "Proof of Work",
+                "Proof of Stake",
+                "Zero-knowledge rollups",
+                "Plasma"
+            ],
+            "Zero-knowledge rollups",
             1
         );
         questions[16] = Question(
-            "Who is known as the 'Father of Computer'?",
-            ["Charles Babbage", "Alan Turing", "Steve Jobs", "Bill Gates"],
-            "Charles Babbage",
+            "What blockchain technology does zkSync primarily focus on?",
+            [
+                "Decentralized finance",
+                "Blockchain storage",
+                "Smart contract execution",
+                "Ethereum scaling"
+            ],
+            "Ethereum scaling",
             1
         );
         questions[17] = Question(
-            "Which gas is most abundant in the Earth's atmosphere?",
-            ["Nitrogen", "Oxygen", "Carbon Dioxide", "Argon"],
-            "Nitrogen",
+            "Is zkSync a layer 2 solution?",
+            ["Yes", "No", "", ""],
+            "Yes",
             1
         );
         questions[18] = Question(
-            "Which planet is known as the 'Morning Star'?",
-            ["Venus", "Mars", "Jupiter", "Saturn"],
-            "Venus",
+            "Does zkSync have its own blockchain?",
+            ["Yes", "No", "", ""],
+            "No",
             1
         );
         questions[19] = Question(
-            "What is the chemical symbol for sodium?",
-            ["Na", "So", "Sn", "Si"],
-            "Na",
+            "What is the primary advantage of zkSync's approach?",
+            ["Security", "Scalability", "Interoperability", "All of the above"],
+            "All of the above",
             1
         );
+
+        // Add 30 new Polygon questions here
         questions[20] = Question(
-            "Who wrote 'Romeo and Juliet'?",
+            "What is Polygon?",
             [
-                "William Shakespeare",
-                "Jane Austen",
-                "Mark Twain",
-                "Charles Dickens"
+                "A Layer 1 blockchain",
+                "A Layer 2 scaling solution for Ethereum",
+                "A new consensus algorithm",
+                "A decentralized exchange"
             ],
-            "William Shakespeare",
+            "A Layer 2 scaling solution for Ethereum",
             1
         );
+
         questions[21] = Question(
-            "What is the capital of Brazil?",
-            ["Brasilia", "Rio de Janeiro", "Sao Paulo", "Salvador"],
-            "Brasilia",
+            "What was Polygon previously known as?",
+            ["PolyChain", "PolygonChain", "Matic Network", "Ethereum Network"],
+            "Matic Network",
             1
         );
+
         questions[22] = Question(
-            "What is the largest organ in the human body?",
-            ["Skin", "Liver", "Heart", "Brain"],
-            "Skin",
+            "What is the native token of Polygon?",
+            ["Polygon", "Matic", "Eth", "Poly"],
+            "Matic",
             1
         );
+
         questions[23] = Question(
-            "Who is the author of 'The Great Gatsby'?",
+            "Which consensus mechanism does Polygon use?",
             [
-                "F. Scott Fitzgerald",
-                "Ernest Hemingway",
-                "William Faulkner",
-                "John Steinbeck"
+                "Proof of Work",
+                "Proof of Authority",
+                "Proof of Stake",
+                "Delegated Proof of Stake"
             ],
-            "F. Scott Fitzgerald",
+            "Proof of Stake",
             1
         );
+
         questions[24] = Question(
-            "What is the chemical symbol for oxygen?",
-            ["O", "Ox", "O2", "O3"],
-            "O",
+            "What is the primary advantage of Polygon?",
+            [
+                "Increased scalability and lower fees",
+                "Improved privacy",
+                "Enhanced security",
+                "Blockchain-based social network"
+            ],
+            "Increased scalability and lower fees",
             1
         );
+
         questions[25] = Question(
-            "Which city is known as the 'City of Love'?",
-            ["Paris", "Rome", "Venice", "Barcelona"],
-            "Paris",
+            "How does Polygon achieve lower transaction costs?",
+            [
+                "By reducing the block size",
+                "By introducing a new gas token",
+                "By batching transactions off-chain",
+                "By using Layer 2 technology"
+            ],
+            "By using Layer 2 technology",
             1
         );
+
         questions[26] = Question(
-            "What is the largest ocean on Earth?",
-            ["Pacific Ocean", "Atlantic Ocean", "Indian Ocean", "Arctic Ocean"],
-            "Pacific Ocean",
+            "Is Polygon fully compatible with Ethereum?",
+            ["Yes", "No", "", ""],
+            "Yes",
             1
         );
+
         questions[27] = Question(
-            "Who painted the ceiling of the Sistine Chapel?",
-            ["Michelangelo", "Leonardo da Vinci", "Raphael", "Donatello"],
-            "Michelangelo",
+            "What is one of the major applications of Polygon?",
+            [
+                "Decentralized finance (DeFi)",
+                "Blockchain games",
+                "Both A and B",
+                "None of the above"
+            ],
+            "Both A and B",
             1
         );
+
         questions[28] = Question(
-            "What is the chemical symbol for carbon?",
-            ["C", "Ca", "Co", "Cr"],
-            "C",
+            "What is Polygon's approach to privacy in transactions?",
+            [
+                "Full transaction visibility",
+                "Selective privacy options",
+                "Complete transaction anonymity",
+                "Polygon does not focus on privacy"
+            ],
+            "Selective privacy options",
             1
         );
+
         questions[29] = Question(
-            "Which country is known as the 'Land of the Rising Sun'?",
-            ["Japan", "China", "Korea", "Vietnam"],
-            "Japan",
+            "Which network is Polygon built on top of?",
+            ["Ethereum", "Bitcoin", "Solana", "Binance Smart Chain"],
+            "Ethereum",
             1
         );
+
+        // Add more questions...
+
         questions[30] = Question(
-            "Who wrote 'Harry Potter' series?",
-            [
-                "J.K. Rowling",
-                "Stephen King",
-                "George R.R. Martin",
-                "J.R.R. Tolkien"
-            ],
-            "J.K. Rowling",
+            "Does Polygon support smart contracts?",
+            ["Yes", "No", "", ""],
+            "Yes",
             1
         );
+
         questions[31] = Question(
-            "What is the hardest natural substance on Earth?",
-            ["Diamond", "Steel", "Titanium", "Graphite"],
-            "Diamond",
+            "What is the maximum supply of Matic tokens?",
+            ["10 billion", "Unlimited", "21 million", "1 billion"],
+            "10 billion",
             1
         );
+
         questions[32] = Question(
-            "What is the tallest mountain in the world?",
-            ["Mount Everest", "K2", "Kangchenjunga", "Lhotse"],
-            "Mount Everest",
+            "Who founded Polygon?",
+            [
+                "Vitalik Buterin",
+                "Sandeep Nailwal and Jaynti Kanani",
+                "Changpeng Zhao",
+                "Brian Armstrong"
+            ],
+            "Sandeep Nailwal and Jaynti Kanani",
             1
         );
+
         questions[33] = Question(
-            "Who is known as the 'Queen of Soul'?",
-            ["Aretha Franklin", "Whitney Houston", "Beyonce", "Mariah Carey"],
-            "Aretha Franklin",
+            "How does Polygon ensure security?",
+            [
+                "By using its own validators",
+                "By relying on Ethereum's security",
+                "By using a new consensus algorithm",
+                "By staking Matic tokens"
+            ],
+            "By relying on Ethereum's security",
             1
         );
+
         questions[34] = Question(
-            "Which planet is known as the 'Evening Star'?",
-            ["Venus", "Mars", "Jupiter", "Saturn"],
-            "Venus",
+            "Which programming language is used for smart contracts on Polygon?",
+            ["Solidity", "Python", "Java", "Rust"],
+            "Solidity",
             1
         );
+
         questions[35] = Question(
-            "What is the chemical symbol for silver?",
-            ["Ag", "Si", "Sv", "Sl"],
-            "Ag",
-            1
-        );
-        questions[36] = Question(
-            "Who was the first man to walk on the moon?",
-            ["Neil Armstrong", "Buzz Aldrin", "Yuri Gagarin", "Alan Shepard"],
-            "Neil Armstrong",
-            1
-        );
-        questions[37] = Question(
-            "What is the capital of Italy?",
-            ["Rome", "Milan", "Florence", "Naples"],
-            "Rome",
-            1
-        );
-        questions[38] = Question(
-            "What is the smallest country in the world?",
-            ["Vatican City", "Monaco", "San Marino", "Liechtenstein"],
-            "Vatican City",
-            1
-        );
-        questions[39] = Question(
-            "Who is the author of 'War and Peace'?",
+            "What is the purpose of Polygon?",
             [
-                "Leo Tolstoy",
-                "Fyodor Dostoevsky",
-                "Anton Chekhov",
-                "Ivan Turgenev"
+                "Decentralized applications (dApps)",
+                "Tokenization",
+                "Blockchain games",
+                "All of the above"
             ],
-            "Leo Tolstoy",
+            "All of the above",
             1
         );
-        questions[40] = Question(
-            "What is the chemical symbol for helium?",
-            ["He", "Hl", "Hm", "Hn"],
-            "He",
-            1
-        );
-        questions[41] = Question(
-            "Which country is known as the 'Land of the Midnight Sun'?",
-            ["Norway", "Sweden", "Finland", "Iceland"],
-            "Norway",
-            1
-        );
-        questions[42] = Question(
-            "Who is the director of the movie 'Schindler's List'?",
-            [
-                "Steven Spielberg",
-                "Martin Scorsese",
-                "Quentin Tarantino",
-                "Alfred Hitchcock"
-            ],
-            "Steven Spielberg",
-            1
-        );
-        questions[43] = Question(
-            "What is the chemical symbol for potassium?",
-            ["K", "Ka", "Kp", "Ko"],
-            "K",
-            1
-        );
-        questions[44] = Question(
-            "Who invented the telephone?",
-            [
-                "Alexander Graham Bell",
-                "Thomas Edison",
-                "Nikola Tesla",
-                "Guglielmo Marconi"
-            ],
-            "Alexander Graham Bell",
-            1
-        );
-        questions[45] = Question(
-            "What is the largest desert in the world?",
-            [
-                "Sahara Desert",
-                "Arctic Desert",
-                "Gobi Desert",
-                "Kalahari Desert"
-            ],
-            "Sahara Desert",
-            1
-        );
-        questions[46] = Question(
-            "Who painted 'Starry Night'?",
-            [
-                "Vincent van Gogh",
-                "Pablo Picasso",
-                "Leonardo da Vinci",
-                "Claude Monet"
-            ],
-            "Vincent van Gogh",
-            1
-        );
-        questions[47] = Question(
-            "What is the chemical symbol for lead?",
-            ["Pb", "Pl", "Pd", "Pe"],
-            "Pb",
-            1
-        );
+
         questions[48] = Question(
-            "Who wrote 'The Catcher in the Rye'?",
+            "How can developers deploy dApps on Polygon?",
             [
-                "J.D. Salinger",
-                "F. Scott Fitzgerald",
-                "Ernest Hemingway",
-                "Mark Twain"
+                "By using Polygon's SDK",
+                "By writing custom contracts",
+                "By deploying directly on Ethereum",
+                "By using Binance Smart Chain"
             ],
-            "J.D. Salinger",
+            "By using Polygon's SDK",
             1
         );
+
         questions[49] = Question(
-            "What is the chemical symbol for iron?",
-            ["Fe", "Ir", "In", "Fr"],
-            "Fe",
+            "What technology does Polygon use to scale Ethereum?",
+            ["Sharding", "Plasma", "Rollups", "Proof of Work"],
+            "Rollups",
             1
         );
+
         questions[50] = Question(
-            "Which river is the longest in the world?",
-            ["Nile", "Amazon", "Yangtze", "Mississippi"],
-            "Nile",
+            "What is one of the unique features of Polygon?",
+            [
+                "Limited number of validators",
+                "High transaction fees",
+                "Zero-knowledge proofs",
+                "Instant withdrawal"
+            ],
+            "Zero-knowledge proofs",
             1
         );
+
         questions[51] = Question(
-            "Who founded Microsoft?",
-            ["Bill Gates", "Steve Jobs", "Jeff Bezos", "Larry Page"],
-            "Bill Gates",
+            "How can you move assets between Ethereum and Polygon?",
+            [
+                "Through bridges",
+                "Through direct transfers",
+                "You can't move assets between them",
+                "Polygon doesn't support assets from Ethereum"
+            ],
+            "Through bridges",
             1
         );
+
         questions[52] = Question(
-            "What is the capital of Spain?",
-            ["Madrid", "Barcelona", "Valencia", "Seville"],
-            "Madrid",
+            "What is the advantage of Polygon over traditional Ethereum?",
+            [
+                "Higher transaction fees",
+                "Slower transaction speeds",
+                "Limited smart contract support",
+                "Lower transaction fees"
+            ],
+            "Lower transaction fees",
             1
         );
+
         questions[53] = Question(
-            "What is the chemical symbol for calcium?",
-            ["Ca", "Ce", "Cm", "Cn"],
-            "Ca",
+            "What is the Polygon bridge?",
+            [
+                "A bridge for moving assets between Polygon and Ethereum",
+                "A bridge for connecting two separate blockchains",
+                "A bridge for connecting to other chains",
+                "A bridge for staking tokens"
+            ],
+            "A bridge for moving assets between Polygon and Ethereum",
             1
         );
+
         questions[54] = Question(
-            "Who wrote '1984'?",
+            "What is the benefit of using Polygon for NFTs?",
             [
-                "George Orwell",
-                "Aldous Huxley",
-                "Ray Bradbury",
-                "Margaret Atwood"
+                "Higher transaction fees",
+                "Lower transaction fees and faster transaction speeds",
+                "Limited NFT support",
+                "Increased gas fees"
             ],
-            "George Orwell",
+            "Lower transaction fees and faster transaction speeds",
             1
         );
+
         questions[55] = Question(
-            "Which animal is known as the 'King of the Jungle'?",
-            ["Lion", "Tiger", "Leopard", "Cheetah"],
-            "Lion",
+            "Does Polygon have its own blockchain?",
+            ["Yes", "No", "", ""],
+            "Yes",
             1
         );
+
+        // Add 30 new Hyperlane questions here
         questions[56] = Question(
-            "What is the chemical symbol for copper?",
-            ["Cu", "Co", "Cp", "Ct"],
-            "Cu",
+            "What is Hyperlane?",
+            [
+                "A blockchain protocol",
+                "A decentralized autonomous organization (DAO)",
+                "A decentralized protocol for interchain communication",
+                "A consensus mechanism"
+            ],
+            "A decentralized protocol for interchain communication",
             1
         );
+
         questions[57] = Question(
-            "Who painted 'The Last Supper'?",
-            ["Leonardo da Vinci", "Michelangelo", "Raphael", "Donatello"],
-            "Leonardo da Vinci",
+            "What is the primary goal of Hyperlane?",
+            [
+                "To increase blockchain interoperability",
+                "To reduce gas fees",
+                "To improve blockchain security",
+                "To create a new blockchain"
+            ],
+            "To increase blockchain interoperability",
             1
         );
+
         questions[58] = Question(
-            "Which planet is known as the 'Red Planet'?",
-            ["Mars", "Venus", "Jupiter", "Mercury"],
-            "Mars",
+            "What is the Hyperlane Mailbox?",
+            [
+                "A smart contract for sending and receiving messages across chains",
+                "A decentralized database",
+                "A new consensus algorithm",
+                "A type of NFT"
+            ],
+            "A smart contract for sending and receiving messages across chains",
             1
         );
+
         questions[59] = Question(
-            "What is the chemical symbol for nitrogen?",
-            ["N", "Ni", "Ne", "Na"],
-            "N",
+            "How does Hyperlane facilitate interchain communication?",
+            [
+                "By using a single blockchain",
+                "Through smart contract deployment",
+                "By enabling seamless and secure cross-chain messaging",
+                "Through off-chain relayers"
+            ],
+            "By enabling seamless and secure cross-chain messaging",
             1
         );
+
         questions[60] = Question(
-            "Who discovered gravity?",
+            "What is the role of an interchain account in Hyperlane?",
             [
-                "Isaac Newton",
-                "Galileo Galilei",
-                "Albert Einstein",
-                "Stephen Hawking"
+                "To manage cross-chain assets",
+                "To handle smart contract execution",
+                "To control and represent accounts across different blockchains",
+                "To store data off-chain"
             ],
-            "Isaac Newton",
+            "To control and represent accounts across different blockchains",
             1
         );
+
         questions[61] = Question(
-            "What is the largest bird in the world?",
-            ["Ostrich", "Emu", "Albatross", "Condor"],
-            "Ostrich",
-            1
-        );
-        questions[62] = Question(
-            "Who wrote 'Pride and Prejudice'?",
+            "What consensus mechanism does Hyperlane use?",
             [
-                "Jane Austen",
-                "Charlotte Bronte",
-                "Emily Dickinson",
-                "Virginia Woolf"
+                "Proof of Work",
+                "Proof of Stake",
+                "Delegated Proof of Stake",
+                "None, Hyperlane uses optimistic consensus"
             ],
-            "Jane Austen",
+            "None, Hyperlane uses optimistic consensus",
             1
         );
+
+        questions[62] = Question(
+            "What is a key feature of Hyperlane?",
+            [
+                "Cross-chain messaging",
+                "High transaction fees",
+                "Proof of Work",
+                "Limited blockchain support"
+            ],
+            "Cross-chain messaging",
+            1
+        );
+
         questions[63] = Question(
-            "What is the chemical symbol for gold?",
-            ["Au", "Ag", "Pt", "Pb"],
-            "Au",
+            "What is the Hyperlane relayer?",
+            [
+                "A network participant that helps facilitate message delivery",
+                "A type of smart contract",
+                "A new consensus algorithm",
+                "A blockchain"
+            ],
+            "A network participant that helps facilitate message delivery",
             1
         );
 
-        
-    }
+        questions[64] = Question(
+            "What kind of architecture does Hyperlane support?",
+            ["Monolithic", "Modular", "Hybrid", "Fragmented"],
+            "Modular",
+            1
+        );
 
+        questions[65] = Question(
+            "What is the Hyperlane API?",
+            [
+                "A tool for querying blockchain data",
+                "A service for interchain communication",
+                "A tool for building dApps",
+                "A framework for smart contract development"
+            ],
+            "A service for interchain communication",
+            1
+        );
+
+        questions[66] = Question(
+            "How does Hyperlane ensure security?",
+            [
+                "By using Proof of Stake",
+                "By relying on Ethereum's security",
+                "Through a decentralized network of relayers",
+                "By staking tokens"
+            ],
+            "Through a decentralized network of relayers",
+            1
+        );
+
+        questions[67] = Question(
+            "What is the Hyperlane protocol's approach to interoperability?",
+            [
+                "By supporting only Ethereum-based chains",
+                "By supporting only non-Ethereum chains",
+                "By enabling communication between different blockchains",
+                "By focusing on one specific blockchain"
+            ],
+            "By enabling communication between different blockchains",
+            1
+        );
+
+        questions[68] = Question(
+            "Does Hyperlane support multiple blockchains?",
+            ["Yes", "No", "", ""],
+            "Yes",
+            1
+        );
+
+        questions[69] = Question(
+            "How can developers use Hyperlane?",
+            [
+                "By deploying smart contracts directly",
+                "By utilizing Hyperlane's SDK and APIs",
+                "By writing contracts in a specific language called HyperSol",
+                "Through off-chain relayers"
+            ],
+            "By utilizing Hyperlane's SDK and APIs",
+            1
+        );
+
+        questions[70] = Question(
+            "What is Hyperlane's approach to governance?",
+            [
+                "Decentralized autonomous organization (DAO)",
+                "Centralized governance",
+                "Governance by Ethereum Foundation",
+                "Governance by Binance Smart Chain"
+            ],
+            "Decentralized autonomous organization (DAO)",
+            1
+        );
+
+        questions[71] = Question(
+            "What is the Hyperlane validator?",
+            [
+                "A network participant that validates cross-chain messages",
+                "A smart contract",
+                "A decentralized storage solution",
+                "A type of cryptocurrency wallet"
+            ],
+            "A network participant that validates cross-chain messages",
+            1
+        );
+
+        questions[72] = Question(
+            "What is the purpose of interchain security in Hyperlane?",
+            [
+                "To prevent cross-chain fraud",
+                "To reduce gas fees",
+                "To improve blockchain speed",
+                "To create a new blockchain"
+            ],
+            "To prevent cross-chain fraud",
+            1
+        );
+
+        questions[73] = Question(
+            "Does Hyperlane have its own blockchain?",
+            ["Yes", "No", "", ""],
+            "No",
+            1
+        );
+
+        questions[74] = Question(
+            "What is a unique aspect of Hyperlane?",
+            [
+                "Limited blockchain compatibility",
+                "Centralized governance",
+                "Interchain accounts and cross-chain apps",
+                "Proof of Work consensus"
+            ],
+            "Interchain accounts and cross-chain apps",
+            1
+        );
+
+        questions[75] = Question(
+            "What role does Hyperlane play in decentralized finance (DeFi)?",
+            [
+                "Enabling cross-chain liquidity",
+                "Creating new DeFi protocols",
+                "Providing higher fees",
+                "None of the above"
+            ],
+            "Enabling cross-chain liquidity",
+            1
+        );
+
+        questions[76] = Question(
+            "What is the primary method of cross-chain communication in Hyperlane?",
+            [
+                "Off-chain relayers",
+                "Cross-chain bridges",
+                "Smart contract calls",
+                "None, Hyperlane focuses on a single blockchain"
+            ],
+            "Cross-chain bridges",
+            1
+        );
+
+        questions[77] = Question(
+            "Does Hyperlane support non-Ethereum blockchains?",
+            ["Yes", "No", "", ""],
+            "Yes",
+            1
+        );
+
+        questions[78] = Question(
+            "What is the purpose of Hyperlane's optimistic consensus?",
+            [
+                "To increase gas fees",
+                "To allow fast cross-chain messaging",
+                "To reduce transaction speed",
+                "To improve transaction costs"
+            ],
+            "To allow fast cross-chain messaging",
+            1
+        );
+
+        questions[79] = Question(
+            "What is Hyperlane's approach to interoperability?",
+            [
+                "Centralized governance",
+                "Blockchain-specific interoperability",
+                "Cross-chain messaging and communication",
+                "Limited interoperability"
+            ],
+            "Cross-chain messaging and communication",
+            1
+        );
+
+        questions[80] = Question(
+            "What is Hyperlane's method of securing cross-chain transactions?",
+            [
+                "Proof of Work",
+                "Proof of Stake",
+                "Optimistic consensus",
+                "Proof of Authority"
+            ],
+            "Optimistic consensus",
+            1
+        );
+
+        questions[81] = Question(
+            "What is the Hyperlane network?",
+            [
+                "A single blockchain",
+                "A set of smart contracts and relayers across multiple blockchains",
+                "A new blockchain protocol",
+                "A decentralized network for storage"
+            ],
+            "A set of smart contracts and relayers across multiple blockchains",
+            1
+        );
+
+        questions[82] = Question(
+            "How does Hyperlane's interchain security work?",
+            [
+                "By using Ethereum's security",
+                "Through a decentralized network of validators",
+                "Through a centralized authority",
+                "By staking tokens"
+            ],
+            "Through a decentralized network of validators",
+            1
+        );
+
+        questions[83] = Question(
+            "How does Hyperlane's optimistic consensus mechanism work?",
+            [
+                "By assuming honesty and punishing fraud",
+                "By requiring user authentication",
+                "By using Proof of Stake",
+                "By using Proof of Work"
+            ],
+            "By assuming honesty and punishing fraud",
+            1
+        );
+
+        questions[84] = Question(
+            "What is Hyperlane's approach to developing cross-chain apps?",
+            [
+                "Using specific languages for each blockchain",
+                "Focusing on Ethereum-based dApps",
+                "Providing interoperability and abstraction layers",
+                "By creating separate versions for each chain"
+            ],
+            "Providing interoperability and abstraction layers",
+            1
+        );
+
+        questions[85] = Question(
+            "Does Hyperlane use zero-knowledge proofs?",
+            ["Yes", "No", "", ""],
+            "Yes",
+            1
+        );
+
+        questions[86] = Question(
+            "What is a relayer in the Hyperlane network?",
+            [
+                "A smart contract",
+                "A network participant that facilitates message delivery",
+                "A new blockchain protocol",
+                "A decentralized storage solution"
+            ],
+            "A network participant that facilitates message delivery",
+            1
+        );
+
+        // Add 30 new Hyperledger questions here
+        questions[86] = Question(
+            "What is Hyperledger?",
+            [
+                "A blockchain",
+                "A decentralized application (dApp)",
+                "A project by The Linux Foundation for blockchain technologies",
+                "A new cryptocurrency"
+            ],
+            "A project by The Linux Foundation for blockchain technologies",
+            1
+        );
+
+        questions[87] = Question(
+            "What is the goal of Hyperledger?",
+            [
+                "To create a private blockchain",
+                "To build blockchain technologies for various industries",
+                "To replace Ethereum",
+                "To introduce new cryptocurrencies"
+            ],
+            "To build blockchain technologies for various industries",
+            1
+        );
+
+        questions[88] = Question(
+            "Which of the following is part of Hyperledger?",
+            ["Polkadot", "Solana", "Fabric", "Avalanche"],
+            "Fabric",
+            1
+        );
+
+        questions[89] = Question(
+            "What is Hyperledger Fabric?",
+            [
+                "A protocol for peer-to-peer networking",
+                "A platform for enterprise blockchain solutions",
+                "A new cryptocurrency",
+                "A decentralized finance protocol"
+            ],
+            "A platform for enterprise blockchain solutions",
+            1
+        );
+
+        questions[90] = Question(
+            "What is the primary focus of Hyperledger Fabric?",
+            [
+                "Scalability",
+                "Public blockchain applications",
+                "Enterprise use cases",
+                "NFT transactions"
+            ],
+            "Enterprise use cases",
+            1
+        );
+
+        questions[91] = Question(
+            "What is the consensus mechanism in Hyperledger Fabric?",
+            [
+                "Proof of Work",
+                "Proof of Stake",
+                "Kafka-based ordering",
+                "Delegated Proof of Stake"
+            ],
+            "Kafka-based ordering",
+            1
+        );
+
+        questions[92] = Question(
+            "What is the purpose of Hyperledger Sawtooth?",
+            [
+                "To support decentralized finance (DeFi)",
+                "To provide modular and flexible blockchain platforms",
+                "To handle token standards",
+                "To create NFTs"
+            ],
+            "To provide modular and flexible blockchain platforms",
+            1
+        );
+
+        questions[93] = Question(
+            "Which programming language is used for Hyperledger smart contracts?",
+            ["Solidity", "Python", "Java", "C++"],
+            "Python",
+            1
+        );
+
+        questions[94] = Question(
+            "What is Hyperledger Indy?",
+            [
+                "A framework for identity management",
+                "A new consensus algorithm",
+                "A new cryptocurrency",
+                "A protocol for peer-to-peer networking"
+            ],
+            "A framework for identity management",
+            1
+        );
+
+        questions[95] = Question(
+            "What is Hyperledger Caliper?",
+            [
+                "A blockchain explorer",
+                "A blockchain performance benchmarking tool",
+                "A framework for creating dApps",
+                "A token standard"
+            ],
+            "A blockchain performance benchmarking tool",
+            1
+        );
+
+        questions[96] = Question(
+            "What is the primary use case for Hyperledger Indy?",
+            [
+                "Supply chain management",
+                "Decentralized finance (DeFi)",
+                "Identity management",
+                "NFT marketplaces"
+            ],
+            "Identity management",
+            1
+        );
+
+        questions[97] = Question(
+            "What is Hyperledger Cello?",
+            [
+                "A blockchain management console",
+                "A smart contract language",
+                "A cryptocurrency wallet",
+                "A token standard"
+            ],
+            "A blockchain management console",
+            1
+        );
+
+        questions[98] = Question(
+            "Which organization oversees Hyperledger?",
+            [
+                "Ethereum Foundation",
+                "The Linux Foundation",
+                "Bitcoin Foundation",
+                "Binance"
+            ],
+            "The Linux Foundation",
+            1
+        );
+
+        questions[99] = Question(
+            "What is Hyperledger Explorer?",
+            [
+                "A tool for exploring blockchain transactions",
+                "A smart contract language",
+                "A new blockchain",
+                "A decentralized finance protocol"
+            ],
+            "A tool for exploring blockchain transactions",
+            1
+        );
+
+        questions[100] = Question(
+            "What is Hyperledger Quilt?",
+            [
+                "A smart contract language",
+                "A cross-chain interoperability framework",
+                "A blockchain management console",
+                "A consensus algorithm"
+            ],
+            "A cross-chain interoperability framework",
+            1
+        );
+
+        questions[101] = Question(
+            "Which of the following is a use case for Hyperledger Fabric?",
+            [
+                "NFT marketplaces",
+                "Decentralized finance (DeFi)",
+                "Supply chain management",
+                "Cryptocurrency trading"
+            ],
+            "Supply chain management",
+            1
+        );
+
+        questions[102] = Question(
+            "What programming language is commonly used to write chaincode in Hyperledger Fabric?",
+            ["Solidity", "Python", "Java", "Rust"],
+            "Java",
+            1
+        );
+
+        questions[103] = Question(
+            "What is the role of Hyperledger Caliper?",
+            [
+                "To manage blockchain infrastructure",
+                "To benchmark blockchain performance",
+                "To handle smart contract execution",
+                "To create NFTs"
+            ],
+            "To benchmark blockchain performance",
+            1
+        );
+    }
 
     function register() external {
         require(!isParticipant[msg.sender], "Already registered");
         isParticipant[msg.sender] = true;
     }
 
-    function getCurrentQuestion()
+     // Function to allow a user to select their preferred protocol
+    function setPreferredProtocol(Protocol protocol) external {
+        userProtocolChoice[msg.sender] = protocol;
+        currentQuestionIndex = 0; // Reset question index when a new protocol is selected
+    }
+
+    function getCurrentQuestion() external view returns (Question memory) {
+        // Get the user's preferred protocol
+        Protocol protocol = userProtocolChoice[msg.sender];
+
+        // Retrieve the questions for the selected protocol
+        Question[] memory protocolQuestions = questionsByProtocol[protocol];
+
+        // Check if the current question index is within the bounds of the questions array
+        require(
+            currentQuestionIndex < protocolQuestions.length,
+            "No more questions available for this protocol"
+        );
+
+        // Return the current question
+        return protocolQuestions[currentQuestionIndex];
+    }
+
+    function getQuestion()
         external
         view
         returns (string memory question, string[4] memory choices)
@@ -652,7 +1211,6 @@ contract MillionaireGame is Ownable(msg.sender) {
         }
         revert("Choice not found");
     }
-    
 
     function compareStrings(string memory a, string memory b)
         internal
@@ -663,7 +1221,8 @@ contract MillionaireGame is Ownable(msg.sender) {
             (bytes(a).length == bytes(b).length) &&
             (keccak256(bytes(a)) == keccak256(bytes(b)));
     }
-     function claimTokens() external {
+
+    function claimTokens() external {
         require(isParticipant[msg.sender], "Not registered");
         require(currentQuestionIndex == MAX_QUESTIONS, "Game not ended");
 
@@ -677,14 +1236,15 @@ contract MillionaireGame is Ownable(msg.sender) {
         emit TokensEarned(msg.sender, participationTokens);
     }
 
-// Helper function to calculate participation tokens
+    // Helper function to calculate participation tokens
     function calculateParticipationTokens() internal view returns (uint256) {
         uint256 totalParticipants = leaderboard.length;
         uint256 participantTokens = totalPrizePool / totalParticipants;
 
-        // Use a conditional statement 
-        return participantBalances[msg.sender] < participantTokens
-            ? participantBalances[msg.sender]
-            : participantTokens;
+        // Use a conditional statement
+        return
+            participantBalances[msg.sender] < participantTokens
+                ? participantBalances[msg.sender]
+                : participantTokens;
     }
 }
